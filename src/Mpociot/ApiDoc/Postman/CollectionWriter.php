@@ -37,26 +37,73 @@ class CollectionWriter
                     'name' => $groupName,
                     'description' => '',
                     'item' => $routes->map(function ($route) {
-                        return [
+                        $result = [
                             'name' => $route['title'] != '' ? $route['title'] : url($route['uri']),
                             'request' => [
                                 'url' => url($route['uri']),
                                 'method' => $route['methods'][0],
-                                'body' => [
-                                    'mode' => 'formdata',
-                                    'formdata' => collect($route['parameters'])->map(function ($parameter, $key) {
-                                        return [
-                                            'key' => $key,
-                                            'value' => isset($parameter['value']) ? $parameter['value'] : '',
-                                            'type' => 'text',
-                                            'enabled' => true,
-                                        ];
-                                    })->values()->toArray(),
-                                ],
                                 'description' => $route['description'],
                                 'response' => [],
                             ],
                         ];
+
+                        if ($route['methods'][0] == 'GET') {
+                            $host = config('app.url');
+                            $host = str_replace('http://', '', $host);
+
+                            $result['request']['body'] = (object)[];
+                            $result['request']['header'] = [];
+                            $result['request']['url'] = (object)[
+                                'variable' => [],
+                                'raw' => "",
+                                'protocol' => "http",
+                                'host' => explode('.', $host),
+                                'path' => explode('/', $route['uri']),
+                                'query' => collect($route['parameters'])->map(function ($parameter, $key) {
+                                    return [
+                                        'key' => $key,
+                                        'value' => isset($parameter['value']) ? $parameter['value'] : '',
+                                        "equals" => true,
+                                        "description" => ""
+                                    ];
+                                })->values()->toArray()
+                            ];
+
+
+                        } else if ($route['methods'][0] == 'PUT') {
+                            $result['request']['header'] = [
+                                (object)[
+                                    "key" => "Content-Type",
+                                    "value" => "application/x-www-form-urlencoded",
+                                    "description" => ""
+                                ]
+                            ];
+                            $result['request']['body'] = [
+                                'mode' => 'urlencoded',
+                                'urlencoded' => collect($route['parameters'])->map(function ($parameter, $key) {
+                                    return [
+                                        'key' => $key,
+                                        'value' => isset($parameter['value']) ? $parameter['value'] : '',
+                                        'type' => 'text',
+                                        'description' => '',
+                                    ];
+                                })->values()->toArray(),
+                            ];
+                        } else {
+                            // post .....
+                            $result['request']['body'] = [
+                                'mode' => 'formdata',
+                                'formdata' => collect($route['parameters'])->map(function ($parameter, $key) {
+                                    return [
+                                        'key' => $key,
+                                        'value' => isset($parameter['value']) ? $parameter['value'] : '',
+                                        'type' => 'text',
+                                        'enabled' => true,
+                                    ];
+                                })->values()->toArray(),
+                            ];
+                        }
+                        return $result;
                     })->toArray(),
                 ];
             })->values()->toArray(),
