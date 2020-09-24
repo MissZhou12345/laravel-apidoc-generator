@@ -2,13 +2,15 @@
 
 namespace Mpociot\ApiDoc\Commands;
 
+use Mpociot\ApiDoc\Tools\DocumentationConfig;
 use ReflectionClass;
 use Illuminate\Console\Command;
 use Mpociot\Reflection\DocBlock;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use Mpociot\Documentarian\Documentarian;
-use Mpociot\ApiDoc\Postman\CollectionWriter;
+use Mpociot\ApiDoc\Postman\CollectionWriter as PostmanCollectionWriter;
+use Mpociot\ApiDoc\Swagger\CollectionWriter as SwaggerCollectionWriter;
 use Mpociot\ApiDoc\Generators\DingoGenerator;
 use Mpociot\ApiDoc\Generators\LaravelGenerator;
 use Mpociot\ApiDoc\Generators\AbstractGenerator;
@@ -43,6 +45,7 @@ class GenerateDocumentation extends Command
      * @var string
      */
     protected $description = 'Generate your API documentation from existing Laravel routes.';
+    protected $config;
 
     /**
      * Create a new command instance.
@@ -61,10 +64,12 @@ class GenerateDocumentation extends Command
      */
     public function handle()
     {
+        $this->config = new DocumentationConfig(config('apidoc'));
+
         if ($this->option('router') === 'laravel') {
-            $generator = new LaravelGenerator();
+            $generator = new LaravelGenerator($this->config);
         } else {
-            $generator = new DingoGenerator();
+            $generator = new DingoGenerator($this->config);
         }
 
         $allowedRoutes = $this->option('routes');
@@ -86,6 +91,7 @@ class GenerateDocumentation extends Command
         } else {
             $parsedRoutes = $this->processDingoRoutes($generator, $allowedRoutes, $routePrefix, $middleware);
         }
+
         $parsedRoutes = collect($parsedRoutes)->groupBy('resource')->sort(function ($a, $b) {
             return strcmp($a->first()['resource'], $b->first()['resource']);
         });
@@ -190,8 +196,10 @@ class GenerateDocumentation extends Command
 
         if ($this->option('noPostmanCollection') !== true) {
             $this->info('Generating Postman collection');
-
             file_put_contents($outputPath.DIRECTORY_SEPARATOR.'collection.json', $this->generatePostmanCollection($parsedRoutes));
+
+            $this->info('Generating Swagger collection');
+            file_put_contents($outputPath.DIRECTORY_SEPARATOR.'collection_swagger.json', $this->generateSwaggerCollection($parsedRoutes));
         }
     }
 
@@ -259,7 +267,7 @@ class GenerateDocumentation extends Command
         $bindings = $this->getBindings();
         $parsedRoutes = [];
         foreach ($routes as $route) {
-            if (in_array($route->getName(), $allowedRoutes) || str_is($routePrefix, $generator->getUri($route)) || in_array($middleware, $route->middleware())) {
+            if (in_array($route->getName(), $allowedRoutes) || \Str::is($routePrefix, $generator->getUri($route)) || in_array($middleware, $route->middleware())) {
                 if ($this->isValidRoute($route) && $this->isRouteVisibleForDocumentation($route->getAction()['uses'])) {
                     $parsedRoutes[] = $generator->processRoute($route, $bindings, $this->option('header'), $withResponse);
                     $this->info('Processed route: ['.implode(',', $generator->getMethods($route)).'] '.$generator->getUri($route));
@@ -341,8 +349,23 @@ class GenerateDocumentation extends Command
      */
     private function generatePostmanCollection(Collection $routes)
     {
-        $writer = new CollectionWriter($routes);
+        $writer = new PostmanCollectionWriter($routes);
 
-        return $writer->getCollection();
+        return $writer->getCollection($this->config);
+    }
+
+    /**
+     *
+     * generateSwaggerCollection
+     *
+     *
+     * @param Collection $routes
+     * @return false|string
+     */
+    private function generateSwaggerCollection(Collection $routes)
+    {
+        $writer = new SwaggerCollectionWriter($routes);
+
+        return $writer->getCollection($this->config);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Mpociot\ApiDoc\Postman;
 
+use Mpociot\ApiDoc\Tools\DocumentationConfig;
 use Ramsey\Uuid\Uuid;
 use Illuminate\Support\Collection;
 
@@ -22,14 +23,14 @@ class CollectionWriter
         $this->routeGroups = $routeGroups;
     }
 
-    public function getCollection()
+    public function getCollection(DocumentationConfig $config)
     {
         $collection = [
             'variables' => [],
             'info' => [
-                'name' => '',
+                'name' => $config->get('title'),
                 '_postman_id' => Uuid::uuid4()->toString(),
-                'description' => '',
+                'description' => $config->get('description'),
                 'schema' => 'https://schema.getpostman.com/json/collection/v2.0.0/collection.json',
             ],
             'item' => $this->routeGroups->map(function ($routes, $groupName) {

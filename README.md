@@ -1,3 +1,116 @@
+
+## 注意注意注意！！！
+https://github.com/mpociot/laravel-apidoc-generator <br/>
+本项目是在以上项目基础之上修改
+
+tips:继续采用request文件的验证规则作为bodyParameters
+    mpociot/laravel-apidoc-generator已经放弃该做法
+    
+
+## 修改的清单
+
+
+- 生成`collection_swagger.json`
+```
+public_path('docs/collection_swagger.json')
+```
+> 可以供yapi自动导入
+
+
+- 规则校验新增 `describe` 规则
+
+```
+public function rules()
+{
+        return [
+            'file' => 'required|file|describe:这里写描述.',
+        ];
+}
+```
+> `describe`只对生成文档有效，不作为laravel校验规则
+
+- `@contentType` 支持
+```
+  @contentType application/json
+```
+
+- `@urlParam` 支持(参照新版实现)
+```
+  @urlParam <name> <type> <"required" (optional)> <description>
+  Examples:
+  @urlParam text string required The text. Example: text
+  @urlParam user_id integer The ID of the user. Example: 50
+
+```
+
+- `@queryParam` 支持(参照新版实现)
+```
+  @queryParam <name> <type> <"required" (optional)> <description>
+  Examples:
+  @queryParam text string required The text. Example: text
+  @queryParam user_id integer The ID of the user. Example: 50
+
+```
+
+- `@cookieParam` 支持(参照新版实现)
+```
+  @cookieParam <name> <type> <"required" (optional)> <description>
+  Examples:
+  @cookieParam text string required The text. Example: text
+  @cookieParam user_id integer The ID of the user. Example: 50
+
+```
+
+- `@headerParam` 支持(参照新版实现)
+```
+  @headerParam <name> <type> <"required" (optional)> <description>
+  Examples:
+  @headerParam text string required The text. Example: text
+  @headerParam user_id integer The ID of the user. Example: 50
+
+```
+
+## 建议
+
+- 为自己添加一些 Live Templates
+```
+命令	注释
+
+@help	查看帮助   
+@dt	data types（不清楚有哪些数据类型，参考）
+@ct	contentType的示例 
+@hp	headerParam的示例    
+@cp	cookieParam的示例    
+@qp	queryParam的示例  
+@up	urlParam的示例  
+
+参考：
+https://blog.csdn.net/tu1091848672/article/details/78670602
+```
+- 修改 `PHP Class Doc Comment`
+```
+/**
+ *
+ *
+ * Class    ${NAME}
+ * 
+ * describe：
+ *
+ * ===========================================
+ * Copyright  ${DATE} ${TIME} 517013774@qq.com
+ *
+ * @resource  ${NAME}
+ * @license   MIT
+ * @package   ${NAMESPACE}
+ * @author    Mz
+ */
+ 
+ `@resource` 加上可以为的接口分组
+ 
+```
+
+
+
 ## Laravel API Documentation Generator
 
 Automatically generate your API documentation from your existing Laravel routes. Take a look at the [example documentation](http://marcelpociot.de/whiteboard/).

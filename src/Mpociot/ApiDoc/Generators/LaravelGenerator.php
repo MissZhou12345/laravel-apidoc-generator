@@ -2,6 +2,11 @@
 
 namespace Mpociot\ApiDoc\Generators;
 
+use Mpociot\ApiDoc\Strategies\ContentTypeParameters\GetContentTypeParamTag;
+use Mpociot\ApiDoc\Strategies\CookieParameters\GetFromCookieParamTag;
+use Mpociot\ApiDoc\Strategies\HeaderParameters\GetFromHeaderParamTag;
+use Mpociot\ApiDoc\Strategies\PathParameters\GetFromPathParamTag;
+use Mpociot\ApiDoc\Strategies\QueryParameters\GetFromQueryParamTag;
 use ReflectionClass;
 use League\Fractal\Manager;
 use Illuminate\Routing\Route;
@@ -43,7 +48,7 @@ class LaravelGenerator extends AbstractGenerator
     }
 
     /**
-     * @param  \Illuminate\Routing\Route $route
+     * @param \Illuminate\Routing\Route $route
      * @param array $bindings
      * @param array $headers
      * @param bool $withResponse
@@ -57,17 +62,25 @@ class LaravelGenerator extends AbstractGenerator
         $routeAction = $route->getAction();
         $routeGroup = $this->getRouteGroup($routeAction['uses']);
         $routeDescription = $this->getRouteDescription($routeAction['uses']);
+        $routeMethod = $this->getRouteMethod($routeAction['uses']);
         $showresponse = null;
+
+        $queryParamTag = new GetFromQueryParamTag($this->getConfig());
+        $pathParamTag = new GetFromPathParamTag($this->getConfig());
+        $headerParamTag = new GetFromHeaderParamTag($this->getConfig());
+        $cookieParamTag = new GetFromCookieParamTag($this->getConfig());
+        $contentTypeParamTag = new GetContentTypeParamTag($this->getConfig());
 
         if ($withResponse) {
             $response = null;
             $docblockResponse = $this->getDocblockResponse($routeDescription['tags']);
+
             if ($docblockResponse) {
                 // we have a response from the docblock ( @response )
                 $response = $docblockResponse;
                 $showresponse = true;
             }
-            if (! $response) {
+            if (!$response) {
                 $transformerResponse = $this->getTransformerResponse($routeDescription['tags']);
                 if ($transformerResponse) {
                     // we have a transformer response from the docblock ( @transformer || @transformercollection )
@@ -75,7 +88,7 @@ class LaravelGenerator extends AbstractGenerator
                     $showresponse = true;
                 }
             }
-            if (! $response) {
+            if (!$response) {
                 $response = $this->getRouteResponse($route, $bindings, $headers);
             }
             if ($response->headers->get('Content-Type') === 'application/json') {
@@ -86,13 +99,19 @@ class LaravelGenerator extends AbstractGenerator
         }
 
         return $this->getParameters([
-            'id' => md5($this->getUri($route).':'.implode($this->getMethods($route))),
+            'id' => md5($this->getUri($route) . ':' . implode($this->getMethods($route))),
             'resource' => $routeGroup,
             'title' => $routeDescription['short'],
             'description' => $routeDescription['long'],
             'methods' => $this->getMethods($route),
             'uri' => $this->getUri($route),
             'parameters' => [],
+            'routeMethod' => $routeMethod,
+            'contentType' => $contentTypeParamTag->getContentTypeFromDocBlock($routeDescription['tags']),
+            'pathParameters' => $pathParamTag->getPathParametersFromDocBlock($routeDescription['tags']),
+            'queryParameters' => $queryParamTag->getQueryParametersFromDocBlock($routeDescription['tags']),
+            'headerParameters' => $headerParamTag->getHeaderParametersFromDocBlock($routeDescription['tags']),
+            'cookieParameters' => $cookieParamTag->getCookieParametersFromDocBlock($routeDescription['tags']),
             'response' => $content,
             'showresponse' => $showresponse,
         ], $routeAction, $bindings);
@@ -101,7 +120,7 @@ class LaravelGenerator extends AbstractGenerator
     /**
      * Prepares / Disables route middlewares.
      *
-     * @param  bool $disable
+     * @param bool $disable
      *
      * @return  void
      */
@@ -113,13 +132,13 @@ class LaravelGenerator extends AbstractGenerator
     /**
      * Call the given URI and return the Response.
      *
-     * @param  string  $method
-     * @param  string  $uri
-     * @param  array  $parameters
-     * @param  array  $cookies
-     * @param  array  $files
-     * @param  array  $server
-     * @param  string  $content
+     * @param string $method
+     * @param string $uri
+     * @param array $parameters
+     * @param array $cookies
+     * @param array $files
+     * @param array $server
+     * @param string $content
      *
      * @return \Illuminate\Http\Response
      */
@@ -140,7 +159,7 @@ class LaravelGenerator extends AbstractGenerator
 
         $kernel->terminate($request, $response);
 
-        if (file_exists($file = App::bootstrapPath().'/app.php')) {
+        if (file_exists($file = App::bootstrapPath() . '/app.php')) {
             $app = require $file;
             $app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
         }
@@ -159,7 +178,7 @@ class LaravelGenerator extends AbstractGenerator
     {
         try {
             $transFormerTags = array_filter($tags, function ($tag) {
-                if (! ($tag instanceof Tag)) {
+                if (!($tag instanceof Tag)) {
                     return false;
                 }
 
@@ -171,7 +190,7 @@ class LaravelGenerator extends AbstractGenerator
             }
 
             $modelTag = array_first(array_filter($tags, function ($tag) {
-                if (! ($tag instanceof Tag)) {
+                if (!($tag instanceof Tag)) {
                     return false;
                 }
 
@@ -179,7 +198,7 @@ class LaravelGenerator extends AbstractGenerator
             }));
             $tag = \array_first($transFormerTags);
             $transformer = $tag->getContent();
-            if (! \class_exists($transformer)) {
+            if (!\class_exists($transformer)) {
                 // if we can't find the transformer we can't generate a response
                 return;
             }
@@ -195,10 +214,10 @@ class LaravelGenerator extends AbstractGenerator
             if (version_compare(PHP_VERSION, '7.0.0') >= 0 && \is_null($type)) {
                 // we can only get the type with reflection for PHP 7
                 if ($parameter->hasType() &&
-                ! $parameter->getType()->isBuiltin() &&
-                \class_exists((string) $parameter->getType())) {
+                    !$parameter->getType()->isBuiltin() &&
+                    \class_exists((string)$parameter->getType())) {
                     //we have a type
-                    $type = (string) $parameter->getType();
+                    $type = (string)$parameter->getType();
                 }
             }
             if ($type) {
@@ -242,8 +261,8 @@ class LaravelGenerator extends AbstractGenerator
     }
 
     /**
-     * @param  string $route
-     * @param  array $bindings
+     * @param string $route
+     * @param array $bindings
      *
      * @return array
      */
@@ -255,7 +274,7 @@ class LaravelGenerator extends AbstractGenerator
 
         foreach ($reflectionMethod->getParameters() as $parameter) {
             $parameterType = $parameter->getClass();
-            if (! is_null($parameterType) && class_exists($parameterType->name)) {
+            if (!is_null($parameterType) && class_exists($parameterType->name)) {
                 $className = $parameterType->name;
 
                 if (is_subclass_of($className, FormRequest::class)) {
