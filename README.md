@@ -105,7 +105,7 @@ https://blog.csdn.net/tu1091848672/article/details/78670602
  * @author    Mz
  */
  
- `@resource` 加上可以为的接口分组
+ `@resource` 加上可以为接口分组
  
 ```
 
