@@ -253,15 +253,15 @@ RES;
 
 - 为自己添加一些 Live Templates
 ```
-命令	注释
+命令  注释
 
-@help	查看帮助   
-@dt	data types（不清楚有哪些数据类型，参考）
-@ct	contentType的示例 
-@hp	headerParam的示例    
-@cp	cookieParam的示例    
-@qp	queryParam的示例  
-@up	urlParam的示例  
+@help   查看帮助   
+@dt data types（不清楚有哪些数据类型，参考）
+@ct contentType的示例 
+@hp headerParam的示例    
+@cp cookieParam的示例    
+@qp queryParam的示例  
+@up urlParam的示例  
 
 参考：
 https://blog.csdn.net/tu1091848672/article/details/78670602
@@ -307,6 +307,28 @@ Automatically generate your API documentation from your existing Laravel routes.
 
 ## Installation
 
+你可以通过vcs的方式安装: 在`composer.json`中添加 `repositories` 属性
+
+```
+"repositories": [
+  {
+    "type": "vcs",
+    "url": "https://github.com/MissZhou12345/laravel-apidoc-generator.git"
+  }
+]
+```
+然后添加：`require-dev`
+```
+"require-dev": {
+    "mpociot/laravel-apidoc-generator": "dev-master"
+}
+```
+你就可以拉取本项目了
+
+
+
+
+
 Require this package with composer using the following command:
 
 ```sh
@@ -333,10 +355,10 @@ This command will scan your applications routes for the URIs matching `api/v1/*`
 ```php
 // API Group Routes
 Route::group(array('prefix' => 'api/v1', 'middleware' => []), function () {
-	// Custom route added to standard Resource
-	Route::get('example/foo', 'ExampleController@foo');
-	// Standard Resource route
-	Route::resource('example', 'ExampleController');
+    // Custom route added to standard Resource
+    Route::get('example/foo', 'ExampleController@foo');
+    // Standard Resource route
+    Route::resource('example', 'ExampleController');
 });
 ```
 
@@ -388,15 +410,15 @@ Above each method within the controller you wish to include in your API document
  */
 class ExampleController extends Controller {
 
-	/**
-	 * This is the short description [and should be unique as anchor tags link to this in navigation menu]
-	 *
-	 * This can be an optional longer description of your API call, used within the documentation.
-	 *
-	 */
-	 public function foo(){
+    /**
+     * This is the short description [and should be unique as anchor tags link to this in navigation menu]
+     *
+     * This can be an optional longer description of your API call, used within the documentation.
+     *
+     */
+     public function foo(){
 
-	 }
+     }
 ```
 
 **Result:** 
