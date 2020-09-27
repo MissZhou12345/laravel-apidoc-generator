@@ -73,6 +73,10 @@ abstract class BaseTransformer extends TransformerAbstract
                 'prePage' => '上一页页码数',
                 'nextPage' => '下一页页码数',
                 'items' => '分页数据集',
+
+                'result' => '返回结果',
+                'message' => '返回的提示消息',
+                'code' => 'code > 0 : 有错误出现',
             ],
             (array)config('apidoc.columnComments'),
             $this->columnComments,
