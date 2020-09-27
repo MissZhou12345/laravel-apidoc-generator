@@ -31,7 +31,7 @@ abstract class BaseTransformer extends TransformerAbstract
     /**
      * 自定义字段注释
      * 当然你也可以通过 config('apidoc.columnComments') 去设置一些通用的字段注释
-     * 优先级为：1：配置config('apidoc.columnComments')；2：属性$columnComments；3：$tables设置的表字段注释；4：整个库
+     * 优先级为：1：属性$columnComments；2：配置config('apidoc.columnComments')；3：$tables设置的表字段注释；4：整个库
      * @var array
      */
     protected $columnComments = [];
