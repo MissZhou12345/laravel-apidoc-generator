@@ -15,10 +15,20 @@ class ApiDocGeneratorServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        // 防止laravel报错
+        \Validator::extend('describe', function($attribute, $value, $parameters, $validator) {
+            return true;
+        });
+
         $this->loadViewsFrom(__DIR__.'/../../resources/views/', 'apidoc');
         $this->loadTranslationsFrom(__DIR__.'/../../resources/lang', 'apidoc');
 
         $this->publishes([
+            __DIR__.'/path/to/config/courier.php' => config_path('courier.php'),
+        ]);
+
+        $this->publishes([
+            __DIR__.'/../../../config/apidoc.php' => config_path('apidoc.php'),
             __DIR__.'/../../resources/lang' => $this->resource_path('lang/vendor/apidoc'),
             __DIR__.'/../../resources/views' => $this->resource_path('views/vendor/apidoc'),
         ]);

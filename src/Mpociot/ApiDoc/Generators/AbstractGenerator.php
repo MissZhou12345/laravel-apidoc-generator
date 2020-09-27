@@ -15,11 +15,26 @@ use Mpociot\ApiDoc\Parsers\RuleDescriptionParser as Description;
 
 abstract class AbstractGenerator
 {
+    protected static $columns = [];
     protected $config;
+    protected $swaggerCollection;
 
-    public function __construct(DocumentationConfig $config)
+    public function __construct(DocumentationConfig $config, $swaggerCollection)
     {
+        self::$columns = [];
+
         $this->setConfig($config);
+        $this->setSwaggerCollection($swaggerCollection);
+    }
+
+    public function setSwaggerCollection($swaggerCollection)
+    {
+        $this->swaggerCollection = $swaggerCollection;
+    }
+
+    public function getSwaggerCollection()
+    {
+        return $this->swaggerCollection;
     }
 
     public function setConfig($config)
@@ -73,37 +88,24 @@ abstract class AbstractGenerator
      */
     protected function getDocblockResponse($tags)
     {
-        $responseTags = array_filter($tags, function ($tag) {
+        $responseTags = collect($tags)->filter(function ($tag) {
             if (!($tag instanceof Tag)) {
                 return false;
             }
-
-            return \strtolower($tag->getName()) == 'response';
+            return strtolower($tag->getName()) == 'response';
         });
         if (empty($responseTags)) {
             return;
         }
-        $responseTag = \array_first($responseTags);
 
-        return \response(\json_encode($responseTag->getContent()));
-    }
-
-    protected function getDocblockResponse1($tags)
-    {
-        $responseTags = array_filter($tags, function ($tag) {
-            if (!($tag instanceof Tag)) {
-                return false;
-            }
-
-            return \strtolower($tag->getName()) == 'response';
-        });
-        if (empty($responseTags)) {
+        $responseTag = $responseTags->first();
+        if (empty($responseTag)) {
             return;
         }
-        $responseTag = \array_first($responseTags);
 
         return \response(\json_encode($responseTag->getContent()));
     }
+
 
     /**
      * @param array $routeData
@@ -114,6 +116,7 @@ abstract class AbstractGenerator
      */
     protected function getParameters($routeData, $routeAction, $bindings)
     {
+        $attributes = $this->getRouteAttributes($routeAction['uses'], $bindings);
         $validator = Validator::make([], $this->getRouteRules($routeAction['uses'], $bindings));
         foreach ($validator->getRules() as $attribute => $rules) {
             $attributeData = [
@@ -130,6 +133,10 @@ abstract class AbstractGenerator
             if (!empty($rule->first())) {
                 $ruleAnalyzing = explode(':', $rule->first(), 2);
                 $attributeData['description'][] = $ruleAnalyzing[1];
+            } else {
+                if (isset($attributes[$attribute]) && $attributes[$attribute]) {
+                    $attributeData['description'][] = $attributes[$attribute];
+                }
             }
 
             foreach ($rules as $ruleName => $rule) {
@@ -150,6 +157,7 @@ abstract class AbstractGenerator
      */
     protected function getRouteResponse($route, $bindings, $headers = [])
     {
+
         $uri = $this->addRouteModelBindings($route, $bindings);
 
         $methods = $this->getMethods($route);
@@ -178,6 +186,7 @@ abstract class AbstractGenerator
     protected function addRouteModelBindings($route, $bindings)
     {
         $uri = $this->getUri($route);
+
         foreach ($bindings as $model => $id) {
             $uri = str_replace('{' . $model . '}', $id, $uri);
         }
@@ -274,6 +283,44 @@ abstract class AbstractGenerator
                         return $parameterReflection->validator()->getRules();
                     } else {
                         return $parameterReflection->rules();
+                    }
+                }
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     *
+     * getRouteAttributes
+     *
+     * @param $route
+     * @param $bindings
+     * @return array
+     * @throws \ReflectionException
+     */
+    protected function getRouteAttributes($route, $bindings)
+    {
+        list($class, $method) = explode('@', $route);
+        $reflection = new ReflectionClass($class);
+        $reflectionMethod = $reflection->getMethod($method);
+
+        foreach ($reflectionMethod->getParameters() as $parameter) {
+            $parameterType = $parameter->getClass();
+            if (!is_null($parameterType) && class_exists($parameterType->name)) {
+                $className = $parameterType->name;
+
+                if (is_subclass_of($className, FormRequest::class)) {
+                    $parameterReflection = new $className;
+                    // Add route parameter bindings
+                    $parameterReflection->query->add($bindings);
+                    $parameterReflection->request->add($bindings);
+
+                    if (method_exists($parameterReflection, 'attributes')) {
+                        return $parameterReflection->attributes();
+                    } else {
+                        return [];
                     }
                 }
             }

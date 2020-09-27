@@ -19,4 +19,10 @@ return [
             'description' => env('APP_ENV', 'local')
         ]
     ],
+    /**
+     * 根据项目不同，定义不同的通用字段
+     */
+    'columnComments' => [
+        'totalPages' => '总共页数',
+    ],
 ];

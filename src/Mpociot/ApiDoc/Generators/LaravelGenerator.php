@@ -2,11 +2,14 @@
 
 namespace Mpociot\ApiDoc\Generators;
 
+use Illuminate\Pagination\LengthAwarePaginator;
 use Mpociot\ApiDoc\Strategies\ContentTypeParameters\GetContentTypeParamTag;
 use Mpociot\ApiDoc\Strategies\CookieParameters\GetFromCookieParamTag;
 use Mpociot\ApiDoc\Strategies\HeaderParameters\GetFromHeaderParamTag;
 use Mpociot\ApiDoc\Strategies\PathParameters\GetFromPathParamTag;
 use Mpociot\ApiDoc\Strategies\QueryParameters\GetFromQueryParamTag;
+use Mpociot\ApiDoc\Tools\Utils;
+use Ramsey\Uuid\Uuid;
 use ReflectionClass;
 use League\Fractal\Manager;
 use Illuminate\Routing\Route;
@@ -79,6 +82,15 @@ class LaravelGenerator extends AbstractGenerator
                 // we have a response from the docblock ( @response )
                 $response = $docblockResponse;
                 $showresponse = true;
+            }
+            if (!$response) {
+                // 为了不占用原先的关键字
+                $transformerResponse = $this->getSwaggerTransformerResponse($routeDescription['tags']);
+                if ($transformerResponse) {
+                    // we have a transformer response from the docblock ( @transformer || @transformercollection )
+                    $response = $transformerResponse;
+                    $showresponse = true;
+                }
             }
             if (!$response) {
                 $transformerResponse = $this->getTransformerResponse($routeDescription['tags']);
@@ -177,7 +189,7 @@ class LaravelGenerator extends AbstractGenerator
     protected function getTransformerResponse($tags)
     {
         try {
-            $transFormerTags = array_filter($tags, function ($tag) {
+            $transFormerTags = collect($tags)->filter(function ($tag) {
                 if (!($tag instanceof Tag)) {
                     return false;
                 }
@@ -189,14 +201,20 @@ class LaravelGenerator extends AbstractGenerator
                 return false;
             }
 
-            $modelTag = array_first(array_filter($tags, function ($tag) {
+
+            $modelTag = collect($tags)->filter(function ($tag) {
                 if (!($tag instanceof Tag)) {
                     return false;
                 }
 
                 return \in_array(\strtolower($tag->getName()), ['transformermodel']);
-            }));
-            $tag = \array_first($transFormerTags);
+            })->first();
+
+            $tag = $transFormerTags->first();
+            if (empty($tag)) {
+                return;
+            }
+
             $transformer = $tag->getContent();
             if (!\class_exists($transformer)) {
                 // if we can't find the transformer we can't generate a response
@@ -206,18 +224,19 @@ class LaravelGenerator extends AbstractGenerator
 
             $reflection = new ReflectionClass($transformer);
             $method = $reflection->getMethod('transform');
-            $parameter = \array_first($method->getParameters());
+            $parameter = collect($method->getParameters())->first();
             $type = null;
             if ($modelTag) {
                 $type = $modelTag->getContent();
             }
+
             if (version_compare(PHP_VERSION, '7.0.0') >= 0 && \is_null($type)) {
                 // we can only get the type with reflection for PHP 7
                 if ($parameter->hasType() &&
                     !$parameter->getType()->isBuiltin() &&
-                    \class_exists((string)$parameter->getType())) {
+                    \class_exists($parameter->getType()->getName())) {
                     //we have a type
-                    $type = (string)$parameter->getType();
+                    $type = (string)$parameter->getType()->getName();
                 }
             }
             if ($type) {
@@ -243,14 +262,15 @@ class LaravelGenerator extends AbstractGenerator
             }
 
             $fractal = new Manager();
+            $transformerModel = new $transformer;
             $resource = [];
             if ($tag->getName() == 'transformer') {
                 // just one
-                $resource = new Item($demoData, new $transformer);
+                $resource = new Item($demoData, $transformerModel);
             }
             if ($tag->getName() == 'transformercollection') {
                 // a collection
-                $resource = new Collection([$demoData, $demoData], new $transformer);
+                $resource = new Collection([$demoData, $demoData], $transformerModel);
             }
 
             return \response($fractal->createData($resource)->toJson());
@@ -259,6 +279,100 @@ class LaravelGenerator extends AbstractGenerator
             return;
         }
     }
+
+    protected function getSwaggerTransformerResponse($tags)
+    {
+        if (!$this->getSwaggerCollection()) {
+            return;
+        }
+
+        try {
+            $transFormerTags = collect($tags)->filter(function ($tag) {
+                if (!($tag instanceof Tag)) {
+                    return false;
+                }
+                return \in_array($tag->getName(), ['responseTransformer']);
+            });
+            if (empty($transFormerTags)) {
+                // we didn't have any of the tags so goodbye
+                return false;
+            }
+
+            $tag = $transFormerTags->first();
+            if (empty($tag)) {
+                return;
+            }
+
+            $transformer = $tag->getContent();
+            if (!\class_exists($transformer)) {
+                // if we can't find the transformer we can't generate a response
+                return;
+            }
+
+            $transformerModel = new $transformer;
+            $datas = $transformerModel->response();
+            $tables = $transformerModel->getTables();
+            $columnComments = $transformerModel->getColumnComments();
+
+            $returnData = [];
+            if (empty($tables)) {
+                $tables = \DB::getDoctrineSchemaManager()->listTableNames();
+            }
+            $this->addComment($datas, $tables, $columnComments, $returnData);
+
+            return \response(json_encode($returnData));
+        } catch (\Exception $e) {
+            // it isn't possible to parse the transformer
+            return;
+        }
+    }
+
+
+    private function getColumns($tables)
+    {
+        foreach ($tables as $table) {
+            if (isset(self::$columns[$table]) && self::$columns[$table]) {
+                continue;
+            }
+            self::$columns[$table] = \DB::getDoctrineSchemaManager()->listTableDetails($table);
+        }
+        return self::$columns;
+    }
+
+    protected function getComment(array $tables, array $columnComments, string $field)
+    {
+        $columns = $this->getColumns($tables);
+        $comment = null;
+        foreach ($columns as $column) {
+            if (isset($columnComments[$field]) && $columnComments[$field]) {
+                $comment = $columnComments[$field];
+                break;
+            }
+            if (!$column->hasColumn($field)) {
+                continue;
+            }
+            $comment = $column->getColumn($field)->getComment();
+        }
+        return $comment;
+    }
+
+    private function addComment($datas, $tables, $columnComments, &$returnData)
+    {
+        foreach ($datas as $key => $data) {
+            if (in_array(gettype($data), ['object', 'array'])) {
+                $this->addComment($data, $tables, $columnComments, $returnData[$key]);
+                $returnData[$key]['_____description'] = $this->getComment($tables, $columnComments, $key);
+            } else {
+                $returnData[$key] = [
+                    '_____key' => Uuid::uuid4()->toString(),
+                    'value' => $data,
+                    'type' => gettype($data),
+                    'description' => $this->getComment($tables, $columnComments, $key),
+                ];
+            }
+        }
+    }
+
 
     /**
      * @param string $route

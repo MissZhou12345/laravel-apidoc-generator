@@ -10,7 +10,7 @@ tips:继续采用request文件的验证规则作为bodyParameters
 ## 修改的清单
 
 
-- 生成`collection_swagger.json`
+- 生成`collection_swagger.json` 需要加 `--swaggerCollection` 参数
 ```
 public_path('docs/collection_swagger.json')
 ```
@@ -28,6 +28,96 @@ public function rules()
 }
 ```
 > `describe`只对生成文档有效，不作为laravel校验规则
+
+- 如果字段中文名能作为描述：上述规则也可以使用laravel验证类的`attributes()`方法
+
+```
+<?php
+
+namespace App\Http\Controllers\Admin\Requests;
+
+use SalesTenant\Commons\Requests\Request;
+
+/**
+ *
+ *
+ * Class    LogIndexRequest
+ *
+ * describe：日志列表的验证码类
+ *
+ * ===========================================
+ * Copyright  2020/9/27 3:20 下午 517013774@qq.com
+ *
+ * @resource  LogIndexRequest
+ * @license   MIT
+ * @package   App\Http\Controllers\Admin\Requests
+ * @author    Mz
+ */
+class LogIndexRequest extends Request
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     *
+     * @return bool
+     */
+    public function authorize()
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array
+     */
+    public function rules()
+    {
+        return [
+            'user_id' => 'sometimes|string|max:32',
+            'operator' => 'sometimes|string|max:128',
+            'url' => 'sometimes|url|max:1024',
+            'start_created_at' => 'sometimes|date',
+            'end_created_at' => 'sometimes|date',
+        ];
+    }
+
+    /**
+     * 获取已定义验证规则的错误消息。
+     *
+     * @return array
+     */
+    public function messages()
+    {
+        return [
+            'string' => ':attribute为字符串.',
+            'max' => ':attribute最少:max个字符,',
+            'url' => ':attribute为URL类型.',
+            'date' => ':attribute为时间类型.',
+        ];
+    }
+
+    /**
+     *
+     * attributes
+     *
+     * @return array
+     */
+    public function attributes()
+    {
+        return [
+            'user_id' => '用户ID',
+            'operator' => '操作用户',
+            'url' => '操作URL',
+            'start_created_at' => '创建时间-开始时间',
+            'end_created_at' => '创建时间-结束时间',
+        ];
+    }
+}
+
+```
+> `describe`优先级大于`attributes()`方法
+
+
 
 - `@contentType` 支持
 ```
@@ -67,6 +157,95 @@ public function rules()
   Examples:
   @headerParam text string required The text. Example: text
   @headerParam user_id integer The ID of the user. Example: 50
+
+```
+
+- `@responseTransformer` 写response 
+```
+/**
+     *
+     * 后台日志列表
+     *
+     * describe：后台日志管理列表
+     *
+     * @urlParam limit integer required 每页条数 Example: 30
+     * @urlParam page integer required 当前分页 Example: 1
+     * @urlParam sort string required 排序字段 Example: created_at
+     * @urlParam order string required 排序方式 Example: DESC
+     *
+     * @responseTransformer App\Transformers\Admin\Log\IndexTransformer
+     *
+     * @param LogIndexRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Exception
+     */
+    public function index(LogIndexRequest $request)
+    {
+        $this->getRouteParam($request);
+        $data = app(AdminOperate::class)->search($request->all(),
+            [$this->routeParam['sort'] => $this->routeParam['order']],
+            $this->routeParam['page'],
+            $this->routeParam['limit']);
+        return $this->paginate($data);
+    }
+```
+
+```
+<?php
+
+namespace App\Transformers\Admin\Log;
+
+use Mpociot\ApiDoc\Transformer\BaseTransformer;
+
+/**
+ *
+ *
+ * Class    IndexTransformer
+ *
+ * describe：
+ *
+ * ===========================================
+ * Copyright  2020/9/27 3:21 下午 517013774@qq.com
+ *
+ * @resource  IndexTransformer
+ * @license   MIT
+ * @package   App\Transformers\Admin\Log
+ * @author    Mz
+ */
+class IndexTransformer extends BaseTransformer
+{
+    /**
+     * 该转换器中字段可能涉及到的表
+     * 如果为空，则会取整个库
+     * @var array
+     */
+    protected $tables = [];
+
+    /**
+     * 自定义字段注释
+     * 当然你也可以通过 config('apidoc.columnComments') 去设置一些通用的字段注释
+     * 优先级为：1：配置config('apidoc.columnComments')；2：属性$columnComments；3：$tables设置的表字段注释；4：整个库
+     * @var array
+     */
+    protected $columnComments = [];
+
+    /**
+     *
+     * response
+     *
+     * describe：
+     *
+     * @return mixed
+     */
+    public function response()
+    {
+        $res = <<<RES
+{"totalPages":147,"totalCount":1462,"page":1,"limit":10,"count":10,"firstPage":true,"lastPage":false,"hasPrePage":false,"hasNextPage":true,"prePage":0,"nextPage":2,"items":[{"id":77392,"user_id":"0","operator":"\u7ba1\u7406\u5458","url":"\/api\/sales\/tenant\/shop\/config","method":"POST","request_data":"{\"shop_tenant_id\":\"98\",\"shop_config\":{\"hash_key\":\"kjN3S3r7yahJZ6wna7DRXZj48RTBXjDF2\"}}","md5":"31c51ede3ddb7fcc924075207e99d7f4","created_at":"2020-09-10 16:27:29","updated_at":"2020-09-10 16:27:29","deleted_at":null},{"id":77391,"user_id":"0","operator":"\u7ba1\u7406\u5458","url":"\/api\/sales\/tenant\/shop","method":"POST","request_data":"{\"source\":\"LWJ_SHOP\",\"name\":\"ddd\",\"tenant_code\":\"TEST08\"}","md5":"f9ff4d0215029eb40eae00224b3e8d09","created_at":"2020-09-10 16:27:21","updated_at":"2020-09-10 16:27:21","deleted_at":null},{"id":77390,"user_id":"0","operator":"\u7ba1\u7406\u5458","url":"\/api\/permission\/bindMenus","method":"PUT","request_data":"{\"id\":1,\"menuIds\":[]}","md5":"5c383d10b3f73a2da30603f584b72497","created_at":"2020-09-08 14:49:14","updated_at":"2020-09-08 14:49:14","deleted_at":null},{"id":77389,"user_id":"0","operator":"\u7ba1\u7406\u5458","url":"\/api\/sales\/user","method":"POST","request_data":"{\"mobile\":\"15982476445\"}","md5":"36e3471db1127c6d8c2b4b06a3b9a9f6","created_at":"2020-09-08 14:49:08","updated_at":"2020-09-08 14:49:08","deleted_at":null},{"id":77388,"user_id":"0","operator":"\u7ba1\u7406\u5458","url":"\/api\/sales\/user\/superAdmin","method":"POST","request_data":"{\"id\":\"e6b1934bddf84733bf1bb417b976105c\",\"is_admin\":0}","md5":"f0297ef6039e9a22aab17a86c9a4d1fa","created_at":"2020-09-08 14:49:05","updated_at":"2020-09-08 14:49:05","deleted_at":null},{"id":77387,"user_id":"0","operator":"\u7ba1\u7406\u5458","url":"\/api\/sales\/config","method":"PUT","request_data":"{\"sales_domain\":\"https:\/\/admin-sales-staging.liweijia.com:28043\",\"sales_oauth_client_id\":\"7aa8ca910e4e4726bb2afbeda283bdd1\",\"sales_oauth_client_secret\":\"ML8PQYRO\",\"sales_oauth_scope\":\"trust\",\"sales_sync\":\"1\",\"recipients\":\"zhoufengmin@liweijia.com|jiangzhiheng@liweijia.com|xuyesi@liweijia.com|liuminzhe@liweijia.com\",\"auto_retry_num\":\"5\"}","md5":"cd218015991a981232778df7d0c73688","created_at":"2020-09-08 14:48:46","updated_at":"2020-09-08 14:48:46","deleted_at":null},{"id":77386,"user_id":"0","operator":"\u7ba1\u7406\u5458","url":"\/api\/sales\/tenant\/import\/order","method":"POST","request_data":"{\"limit\":10,\"page\":1,\"tenant_code\":\"DSFPTCLOUD\",\"tenant_id\":123,\"sales_user_id\":\"ganwang0001\",\"mobile\":\"15777779003\",\"store_code\":\"AA0BBB76\",\"file\":\"\/upload\/templates\/1a5bed584172272a6438cecb49d4f20e.xlsx\",\"pwd\":\"UDlaV2FFUTlvcllWS0ZTWGs1TzQ5dz09\"}","md5":"cdd32781477204750eced9f3d43cfa93","created_at":"2020-09-08 14:48:30","updated_at":"2020-09-08 14:48:30","deleted_at":null},{"id":77385,"user_id":"0","operator":"\u7ba1\u7406\u5458","url":"\/api\/sales\/tenant\/import\/order","method":"POST","request_data":"{\"limit\":10,\"page\":1,\"tenant_code\":\"DSFPTCLOUD\",\"tenant_id\":123,\"sales_user_id\":\"ganwang0001\",\"mobile\":\"15777779003\",\"store_code\":\"AA0BBB76\",\"file\":\"\/upload\/templates\/1a5bed584172272a6438cecb49d4f20e.xlsx\",\"pwd\":\"UDlaV2FFUTlvcllWS0ZTWGs1TzQ5dz09\"}","md5":"cdd32781477204750eced9f3d43cfa93","created_at":"2020-09-08 14:47:26","updated_at":"2020-09-08 14:47:26","deleted_at":null},{"id":77384,"user_id":"0","operator":"\u7ba1\u7406\u5458","url":"\/api\/sales\/attachment\/excel","method":"POST","request_data":"{\"rename\":\"1\",\"type\":\"local\",\"folder\":\"templates\",\"file\":{}}","md5":"c6f4002c95f062961198cab600c3e861","created_at":"2020-09-08 14:47:24","updated_at":"2020-09-08 14:47:24","deleted_at":null},{"id":77383,"user_id":"0","operator":"\u7ba1\u7406\u5458","url":"\/api\/sales\/tenant\/import\/order","method":"POST","request_data":"{\"limit\":10,\"page\":1,\"tenant_code\":\"TEST06_710\",\"tenant_id\":184,\"sales_user_id\":\"ganwang0001\",\"mobile\":\"13800008989\",\"store_code\":\"HTQXL01\",\"file\":\"\/upload\/templates\/1a5bed584172272a6438cecb49d4f20e.xlsx\",\"pwd\":\"UDlaV2FFUTlvcllWS0ZTWGs1TzQ5dz09\"}","md5":"6dfde587d7b12ee5db01885a691f3a08","created_at":"2020-09-08 14:46:58","updated_at":"2020-09-08 14:46:58","deleted_at":null}]}
+RES;
+        return json_decode($res);
+    }
+
+}
 
 ```
 

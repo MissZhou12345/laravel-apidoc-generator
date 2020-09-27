@@ -70,7 +70,7 @@ class CollectionWriter
                     'schema' => (object)[
                         'required' => $this->getRequiredList($parameters),
                         'properties' => $this->getPropertiesList($parameters),
-                        'type' => 'object',
+                        'type' => 'object'
                     ]
                 ]
             ]
@@ -92,8 +92,15 @@ class CollectionWriter
                         'summary' => $route['title'],
                         'description' => $route['description'],
                         'operationId' => $route['routeMethod'],
-                        'requestBody' => $this->getRequestBody($route['contentType'], $route['parameters']),
+
+                        'responses' => $this->getResponses($route['response']),
+
+                        'consumes' => [
+                            "multipart/form-data"
+                        ],
+//                        'requestBody' => $this->getRequestBody($route['contentType'], $route['parameters']),
                         'parameters' => array_merge(
+                            $this->getParameters($route['parameters'], 'formData'),
                             $this->getParameters($route['queryParameters'], 'query'),
                             $this->getParameters($route['pathParameters'], 'path'),
                             $this->getParameters($route['cookieParameters'], 'cookie'),
@@ -132,21 +139,90 @@ class CollectionWriter
         return json_encode($collection);
     }
 
+    private function getResponses($response)
+    {
+        $httpCode = [200];
+
+        $responseData = json_decode($response);
+        if (empty($responseData)) {
+            return [];
+        }
+
+        $res = [
+            'description' => 'description',
+            'schema' => [
+                '$schema' => "http://json-schema.org/draft-04/schema#",
+                'properties' => [],
+                'required' => [],
+                'type' => 'object',
+            ],
+        ];
+        $properties = [];
+        foreach ($responseData as $key => $item) {
+            $properties[$key] = $this->dealResponsesStruct($item);
+        }
+
+        $res['schema']['properties'] = (object)$properties;
+
+        return [
+            200 => $res
+        ];
+    }
+
+    private function dealResponsesStruct($item)
+    {
+
+        if (in_array(gettype($item), ['object', 'array']) && isset($item->_____key)) {
+            return [
+                'description' => $item->description,
+                "example" => $item->value,
+                "default" => $item->value,
+                'type' => $item->type,
+            ];
+        } else if (in_array(gettype($item), ['object', 'array'])) {
+            $properties = [];
+            foreach ($item as $k => $v) {
+                if ($k == '_____description') {
+                    continue;
+                }
+                $properties[$k] = $this->dealResponsesStruct($v);
+            }
+            return [
+                'description' => $item->_____description ?? gettype($item) . " description",
+                'properties' => (object)$properties,
+                'type' => 'object',
+            ];
+        } else {
+            return [
+                'description' => $item->description ?? null,
+                "example" => $item->value ?? null,
+                "default" => $item->value ?? null,
+                'type' => $item->type ?? null,
+            ];
+
+        }
+    }
+
+
     /**
      *
      * getParameters
      *
      * @param $parameters
-     * @param $in "query", "header", "path" or "cookie".
+     * @param $in "body", "formData", "query", "header", "path" or "cookie".
      * @return array
      */
     private function getParameters($parameters, $in)
     {
         return collect($parameters)->map(function ($parameter, $key) use ($in) {
+            $description = $parameter['description'];
+            if (is_array($parameter['description'])) {
+                $description = $parameter['description'] ? implode('|', $parameter['description']) : '';
+            }
             return [
                 'name' => $key,
-                "in" => $in,// "query", "header", "path" or "cookie".
-                "description" => $parameter['description'],
+                "in" => $in,// "body", "formData", "query", "header", "path" or "cookie".
+                "description" => $description,
                 "required" => $parameter['required'],
                 "default" => $parameter['value'],
                 "example" => $parameter['value'],
