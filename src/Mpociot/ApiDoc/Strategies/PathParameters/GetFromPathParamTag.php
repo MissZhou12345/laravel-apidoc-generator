@@ -46,7 +46,7 @@ class GetFromPathParamTag extends Strategy
                     : $example;
                 return [$name => compact('type', 'description', 'required', 'value')];
             })->toArray();
-
+        
         return $parameters;
     }
 

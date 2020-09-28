@@ -29,11 +29,11 @@ class LaravelGenerator extends AbstractGenerator
      */
     public function getUri($route)
     {
+        $uri = $route->uri();
         if (version_compare(app()->version(), '5.4', '<')) {
-            return $route->getUri();
+            $uri = $route->getUri();
         }
-
-        return $route->uri();
+        return $uri;
     }
 
     /**
@@ -68,9 +68,7 @@ class LaravelGenerator extends AbstractGenerator
         $routeMethod = $this->getRouteMethod($routeAction['uses']);
         $showresponse = null;
 
-        $queryParamTag = new GetFromQueryParamTag($this->getConfig());
-        $pathParamTag = new GetFromPathParamTag($this->getConfig());
-        $headerParamTag = new GetFromHeaderParamTag($this->getConfig());
+
         $cookieParamTag = new GetFromCookieParamTag($this->getConfig());
         $contentTypeParamTag = new GetContentTypeParamTag($this->getConfig());
 
@@ -110,20 +108,21 @@ class LaravelGenerator extends AbstractGenerator
             }
         }
 
+        $routeId = md5($this->getUri($route) . ':' . implode($this->getMethods($route)));
         return $this->getParameters([
-            'id' => md5($this->getUri($route) . ':' . implode($this->getMethods($route))),
+            'id' => $routeId,
             'resource' => $routeGroup,
             'title' => $routeDescription['short'],
             'description' => $routeDescription['long'],
             'methods' => $this->getMethods($route),
-            'uri' => $this->getUri($route),
+            'uri' => str_replace('?', '', $this->getUri($route)),
             'parameters' => [],
             'routeMethod' => $routeMethod,
-            'contentType' => $contentTypeParamTag->getContentTypeFromDocBlock($routeDescription['tags']),
-            'pathParameters' => $pathParamTag->getPathParametersFromDocBlock($routeDescription['tags']),
-            'queryParameters' => $queryParamTag->getQueryParametersFromDocBlock($routeDescription['tags']),
-            'headerParameters' => $headerParamTag->getHeaderParametersFromDocBlock($routeDescription['tags']),
-            'cookieParameters' => $cookieParamTag->getCookieParametersFromDocBlock($routeDescription['tags']),
+            'contentType' => $this->getContentType($routeId,$route,$routeAction),
+            'pathParameters' => $this->getRouteParameters($routeId,$route,$routeAction),
+            'headerParameters' => $this->getHeaderParameters($routeId,$route,$routeAction),
+            'queryParameters' => [],
+            'cookieParameters' => [],
             'response' => $content,
             'showresponse' => $showresponse,
         ], $routeAction, $bindings);

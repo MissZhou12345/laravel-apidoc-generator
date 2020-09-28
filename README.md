@@ -16,10 +16,73 @@ public_path('docs/collection_swagger.json')
 ```
 > 可以供yapi自动导入
 
+- request相关的参数都在request验证类中提现，需要继承`Mpociot\ApiDoc\Request\BaseRequest`
+```php
+<?php
+
+namespace Mpociot\ApiDoc\Request;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+/**
+ *
+ *
+ * Class    BaseRequest
+ *
+ * describe：
+ *
+ * ===========================================
+ * Copyright  2020/9/28 2:25 下午 517013774@qq.com
+ *
+ * @resource  BaseRequest
+ * @license   MIT
+ * @package   Mpociot\ApiDoc\Request
+ * @author    Mz
+ */
+abstract class BaseRequest extends FormRequest implements RequestInterface
+{
+   
+}
+
+```
+
+```php
+<?php
+
+namespace Mpociot\ApiDoc\Request;
+
+interface RequestInterface
+{
+
+    /**
+     * 路由验证规则
+     * tips: 生成文档时required|sometimes|regex等规则会被屏蔽掉，原因是：需要以路由参数为准
+     * @return array
+     */
+    public function routeRules(): array;
+
+    /**
+     * header验证规则
+     * @return array
+     */
+    public function headerRules(): array;
+
+    /**
+     *
+     * getSwaggerContentType
+     * 默认值：application/json
+     *
+     * @return string
+     */
+    public function getSwaggerContentType(): string;
+
+}
+```
 
 - 规则校验新增 `describe` 规则
 
-```
+```php
+
 public function rules()
 {
         return [
@@ -31,7 +94,7 @@ public function rules()
 
 - 如果字段中文名能作为描述：上述规则也可以使用laravel验证类的`attributes()`方法
 
-```
+```php
 <?php
 
 namespace App\Http\Controllers\Admin\Requests;
@@ -41,19 +104,19 @@ use SalesTenant\Commons\Requests\Request;
 /**
  *
  *
- * Class    LogIndexRequest
+ * Class    UserIndexRequest
  *
- * describe：日志列表的验证码类
+ * describe：用户管理列表的验证码类
  *
  * ===========================================
- * Copyright  2020/9/27 3:20 下午 517013774@qq.com
+ * Copyright  2020/9/27 4:11 下午 517013774@qq.com
  *
- * @resource  LogIndexRequest
+ * @resource  UserIndexRequest
  * @license   MIT
  * @package   App\Http\Controllers\Admin\Requests
  * @author    Mz
  */
-class LogIndexRequest extends Request
+class UserIndexRequest extends Request
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -65,21 +128,6 @@ class LogIndexRequest extends Request
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array
-     */
-    public function rules()
-    {
-        return [
-            'user_id' => 'sometimes|string|max:32',
-            'operator' => 'sometimes|string|max:128',
-            'url' => 'sometimes|url|max:1024',
-            'start_created_at' => 'sometimes|date',
-            'end_created_at' => 'sometimes|date',
-        ];
-    }
 
     /**
      * 获取已定义验证规则的错误消息。
@@ -89,10 +137,10 @@ class LogIndexRequest extends Request
     public function messages()
     {
         return [
+            'regex' => ':attribute格式不正确.',
             'string' => ':attribute为字符串.',
-            'max' => ':attribute最少:max个字符,',
-            'url' => ':attribute为URL类型.',
-            'date' => ':attribute为时间类型.',
+            'integer' => ':attribute为数字,',
+            'in' => ':attribute只能是:values其中之一.',
         ];
     }
 
@@ -105,73 +153,64 @@ class LogIndexRequest extends Request
     public function attributes()
     {
         return [
-            'user_id' => '用户ID',
-            'operator' => '操作用户',
-            'url' => '操作URL',
-            'start_created_at' => '创建时间-开始时间',
-            'end_created_at' => '创建时间-结束时间',
+            'keyword' => '关键字',
+            'name' => '用户姓名',
+            'mobile' => '手机',
+            'email' => '邮箱',
+            'is_admin' => '搜索管理员'
         ];
     }
+
+    /**
+     * 请求体验证规则
+     * @return array
+     */
+    public function rules(): array
+    {
+        return [
+            'keyword' => 'sometimes|regex:/^[0-9]+$/|describe:搜索：姓名、邮箱、手机等字段.',
+            'name' => 'sometimes|describe:搜索姓名',
+            'mobile' => 'sometimes|describe:搜索手机',
+            'email' => 'sometimes|describe:搜索邮箱',
+            'is_admin' => 'sometimes|integer|in:0,1|describe:搜索是否是管理员',
+        ];
+    }
+
+    /**
+     * 路由验证规则
+     * tips: 生成文档时required|sometimes|regex等规则会被屏蔽掉，原因是：需要以路由参数为准
+     * @return array
+     */
+    public function routeRules(): array
+    {
+        return [
+            'limit' => "integer|describe:每页条数",
+            'page' => "integer|describe:当前分页",
+            'sort' => "string|describe:排序字段",
+            'order' => "string|in:DESC,ASC|describe:排序字段",
+        ];
+    }
+    public function headerRules(): array
+    {
+        return [
+            'Content-Type' => "required|string|describe:媒体",
+            'Cookie' => 'required|string|describe:登录时需要的cookie.',
+        ];
+    }
+
 }
+
 
 ```
 > `describe`优先级大于`attributes()`方法
 
-
-
-- `@contentType` 支持
-```
-  @contentType application/json
-```
-
-- `@urlParam` 支持(参照新版实现)
-```
-  @urlParam <name> <type> <"required" (optional)> <description>
-  Examples:
-  @urlParam text string required The text. Example: text
-  @urlParam user_id integer The ID of the user. Example: 50
-
-```
-
-- `@queryParam` 支持(参照新版实现)
-```
-  @queryParam <name> <type> <"required" (optional)> <description>
-  Examples:
-  @queryParam text string required The text. Example: text
-  @queryParam user_id integer The ID of the user. Example: 50
-
-```
-
-- `@cookieParam` 支持(参照新版实现)
-```
-  @cookieParam <name> <type> <"required" (optional)> <description>
-  Examples:
-  @cookieParam text string required The text. Example: text
-  @cookieParam user_id integer The ID of the user. Example: 50
-
-```
-
-- `@headerParam` 支持(参照新版实现)
-```
-  @headerParam <name> <type> <"required" (optional)> <description>
-  Examples:
-  @headerParam text string required The text. Example: text
-  @headerParam user_id integer The ID of the user. Example: 50
-
-```
-
-- `@responseTransformer` 写response 
+- 使用`@responseTransformer`标签 写 response 
 ```
 /**
      *
      * 后台日志列表
      *
      * describe：后台日志管理列表
-     *
-     * @urlParam limit integer required 每页条数 Example: 30
-     * @urlParam page integer required 当前分页 Example: 1
-     * @urlParam sort string required 排序字段 Example: created_at
-     * @urlParam order string required 排序方式 Example: DESC
      *
      * @responseTransformer App\Transformers\Admin\Log\IndexTransformer
      *
@@ -190,7 +229,7 @@ class LogIndexRequest extends Request
     }
 ```
 
-```
+```php
 <?php
 
 namespace App\Transformers\Admin\Log;
@@ -253,15 +292,10 @@ RES;
 
 - 为自己添加一些 Live Templates
 ```
-命令  注释
+命令	注释
 
-@help   查看帮助   
-@dt data types（不清楚有哪些数据类型，参考）
-@ct contentType的示例 
-@hp headerParam的示例    
-@cp cookieParam的示例    
-@qp queryParam的示例  
-@up urlParam的示例  
+@help	查看帮助   
+@dt	data types（不清楚有哪些数据类型，参考）
 
 参考：
 https://blog.csdn.net/tu1091848672/article/details/78670602
@@ -355,10 +389,10 @@ This command will scan your applications routes for the URIs matching `api/v1/*`
 ```php
 // API Group Routes
 Route::group(array('prefix' => 'api/v1', 'middleware' => []), function () {
-    // Custom route added to standard Resource
-    Route::get('example/foo', 'ExampleController@foo');
-    // Standard Resource route
-    Route::resource('example', 'ExampleController');
+	// Custom route added to standard Resource
+	Route::get('example/foo', 'ExampleController@foo');
+	// Standard Resource route
+	Route::resource('example', 'ExampleController');
 });
 ```
 
@@ -410,15 +444,15 @@ Above each method within the controller you wish to include in your API document
  */
 class ExampleController extends Controller {
 
-    /**
-     * This is the short description [and should be unique as anchor tags link to this in navigation menu]
-     *
-     * This can be an optional longer description of your API call, used within the documentation.
-     *
-     */
-     public function foo(){
+	/**
+	 * This is the short description [and should be unique as anchor tags link to this in navigation menu]
+	 *
+	 * This can be an optional longer description of your API call, used within the documentation.
+	 *
+	 */
+	 public function foo(){
 
-     }
+	 }
 ```
 
 **Result:** 

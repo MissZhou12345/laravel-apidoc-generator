@@ -117,8 +117,99 @@ abstract class AbstractGenerator
     protected function getParameters($routeData, $routeAction, $bindings)
     {
         $attributes = $this->getRouteAttributes($routeAction['uses'], $bindings);
+
         $validator = Validator::make([], $this->getRouteRules($routeAction['uses'], $bindings));
-        foreach ($validator->getRules() as $attribute => $rules) {
+
+        $parameters = $this->getAttributeData($routeData['id'], $validator->getRules(), $attributes);
+
+        $routeData['parameters'] = $parameters;
+
+        return $routeData;
+    }
+
+    /**
+     *
+     * 过滤掉必填参数
+     * @param $route
+     * @return array
+     */
+    private function filterParameterRequied($route)
+    {
+        preg_match_all('/\{(.*?)\}/', $route->getDomain() . $route->uri, $matches);
+        return collect($matches[1])->filter(function ($param) {
+            return strpos($param, '?') === false;
+        });
+    }
+
+    protected function getHeaderParameters($routeId, $route, $routeAction)
+    {
+        $validator = Validator::make([], $this->getRouteHeaderRules($routeAction['uses'], []));
+
+        $rules = (array)$validator->getRules();
+
+        return $this->getAttributeData($routeId, $rules);
+    }
+
+    protected function getContentType($routeId, $route, $routeAction)
+    {
+       return $this->getContentTypeStr($routeAction['uses'], []);
+    }
+    protected function getRouteParameters($routeId, $route, $routeAction)
+    {
+        $wheres = collect($route->wheres);
+        $parameterNames = $route->parameterNames();
+        $parameterRequied = $this->filterParameterRequied($route);
+
+
+        $parameterRules = [];
+        foreach ($parameterNames as $parameterName) {
+            $rules = [];
+            $requied = $parameterRequied->filter(function ($param) use ($parameterName) {
+                return $param == $parameterName;
+            })->first();
+
+            $pattern = $wheres->filter(function ($param, $key) use ($parameterName) {
+                return $key == $parameterName;
+            })->first();
+
+            $rules[] = empty($requied) ? 'sometimes' : 'required';
+            if (!empty($pattern)) {
+                $rules[] = "regex:/^{$pattern}&/";
+            }
+
+            $parameterRules[$parameterName] = $rules;
+        }
+
+        $validator = Validator::make([], $this->getRouteRouteRules($routeAction['uses'], []));
+
+        $rules = (array)$validator->getRules();
+        foreach ($parameterRules as $key => &$parameterRule) {
+            // 屏蔽掉 required|sometimes|regex
+            foreach ($rules[$key] ?? [] as $rule) {
+                if (strpos($rule, 'required') !== false
+                    || strpos($rule, 'sometimes') !== false
+                    || strpos($rule, 'regex') !== false) {
+                    continue;
+                }
+                $parameterRule[] = $rule;
+            }
+        }
+
+        return $this->getAttributeData($routeId, $parameterRules);
+    }
+
+    /**
+     *
+     * getAttributeData
+     *
+     * @param $routeId
+     * @param $list
+     * @return array
+     */
+    public function getAttributeData($routeId, $list, $attributes = [])
+    {
+        $parameters = [];
+        foreach ($list as $attribute => $rules) {
             $attributeData = [
                 'required' => false,
                 'type' => null,
@@ -127,8 +218,8 @@ abstract class AbstractGenerator
                 'description' => [],
             ];
 
-            $rule = collect($rules)->filter(function ($rule) {
-                return strpos($rule, 'describe') !== false;
+            $rule = collect($rules)->filter(function ($r) {
+                return strpos($r, 'describe') !== false;
             });
             if (!empty($rule->first())) {
                 $ruleAnalyzing = explode(':', $rule->first(), 2);
@@ -140,12 +231,11 @@ abstract class AbstractGenerator
             }
 
             foreach ($rules as $ruleName => $rule) {
-                $this->parseRule($rule, $attribute, $attributeData, $routeData['id']);
+                $this->parseRule($rule, $attribute, $attributeData, $routeId);
             }
-            $routeData['parameters'][$attribute] = $attributeData;
+            $parameters[$attribute] = $attributeData;
         }
-
-        return $routeData;
+        return $parameters;
     }
 
     /**
@@ -157,7 +247,6 @@ abstract class AbstractGenerator
      */
     protected function getRouteResponse($route, $bindings, $headers = [])
     {
-
         $uri = $this->addRouteModelBindings($route, $bindings);
 
         $methods = $this->getMethods($route);
@@ -262,33 +351,18 @@ abstract class AbstractGenerator
      *
      * @return array
      */
-    protected function getRouteRules($route, $bindings)
+    protected function getRouteRules($uses, $bindings)
     {
-        list($class, $method) = explode('@', $route);
-        $reflection = new ReflectionClass($class);
-        $reflectionMethod = $reflection->getMethod($method);
-
-        foreach ($reflectionMethod->getParameters() as $parameter) {
-            $parameterType = $parameter->getClass();
-            if (!is_null($parameterType) && class_exists($parameterType->name)) {
-                $className = $parameterType->name;
-
-                if (is_subclass_of($className, FormRequest::class)) {
-                    $parameterReflection = new $className;
-                    // Add route parameter bindings
-                    $parameterReflection->query->add($bindings);
-                    $parameterReflection->request->add($bindings);
-
-                    if (method_exists($parameterReflection, 'validator')) {
-                        return $parameterReflection->validator()->getRules();
-                    } else {
-                        return $parameterReflection->rules();
-                    }
-                }
-            }
+        $parameterReflection = $this->getFormRequestReflection($uses, $bindings);
+        if (empty($parameterReflection)) {
+            return [];
         }
 
-        return [];
+        if (method_exists($parameterReflection, 'validator')) {
+            return $parameterReflection->validator()->getRules();
+        } else {
+            return $parameterReflection->rules();
+        }
     }
 
     /**
@@ -302,7 +376,81 @@ abstract class AbstractGenerator
      */
     protected function getRouteAttributes($route, $bindings)
     {
-        list($class, $method) = explode('@', $route);
+        $parameterReflection = $this->getFormRequestReflection($route, $bindings);
+        if (empty($parameterReflection)) {
+            return [];
+        }
+
+        if (method_exists($parameterReflection, 'attributes')) {
+            return $parameterReflection->attributes();
+        } else {
+            return [];
+        }
+    }
+
+    /**
+     *
+     * 获取验证类的  routeRules() 方法 用于取描述和字段类型
+     *
+     * @param $uses
+     * @param $bindings
+     * @return array
+     * @throws \ReflectionException
+     */
+    protected function getRouteRouteRules($uses, $bindings)
+    {
+        $parameterReflection = $this->getFormRequestReflection($uses, $bindings);
+        if (empty($parameterReflection)) {
+            return [];
+        }
+
+        if (method_exists($parameterReflection, 'routeRules')) {
+            return $parameterReflection->routeRules();
+        } else {
+            return [];
+        }
+    }
+
+    protected function getContentTypeStr($uses, $bindings)
+    {
+        $parameterReflection = $this->getFormRequestReflection($uses, $bindings);
+        if (empty($parameterReflection)) {
+            return '';
+        }
+
+        if (method_exists($parameterReflection, 'getSwaggerContentType')) {
+            return $parameterReflection->getSwaggerContentType();
+        } else {
+            return '';
+        }
+    }
+
+    protected function getRouteHeaderRules($uses, $bindings)
+    {
+        $parameterReflection = $this->getFormRequestReflection($uses, $bindings);
+        if (empty($parameterReflection)) {
+            return [];
+        }
+
+        if (method_exists($parameterReflection, 'headerRules')) {
+            return $parameterReflection->headerRules();
+        } else {
+            return [];
+        }
+    }
+
+    /**
+     *
+     * getFormRequestReflection
+     *
+     * @param $route
+     * @param $bindings
+     * @return null
+     * @throws \ReflectionException
+     */
+    private function getFormRequestReflection($uses, $bindings)
+    {
+        list($class, $method) = explode('@', $uses);
         $reflection = new ReflectionClass($class);
         $reflectionMethod = $reflection->getMethod($method);
 
@@ -317,17 +465,14 @@ abstract class AbstractGenerator
                     $parameterReflection->query->add($bindings);
                     $parameterReflection->request->add($bindings);
 
-                    if (method_exists($parameterReflection, 'attributes')) {
-                        return $parameterReflection->attributes();
-                    } else {
-                        return [];
-                    }
+                    return $parameterReflection;
                 }
             }
         }
 
-        return [];
+        return null;
     }
+
 
     /**
      * @param array $arr
