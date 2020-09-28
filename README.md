@@ -16,7 +16,7 @@ public_path('docs/collection_swagger.json')
 ```
 > 可以供yapi自动导入
 
-- request相关的参数都在request验证类中提现，需要继承`Mpociot\ApiDoc\Request\BaseRequest`
+- request相关的参数都在request验证类中体现，需要继承`Mpociot\ApiDoc\Request\BaseRequest`
 ```php
 <?php
 
