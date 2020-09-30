@@ -115,7 +115,7 @@ class CollectionWriter
         }
 
         $collection = [
-            'openapi' => "3.0.0",// TODO 暂时写死，版本更改很有可能也导致json格式改变
+            "swagger"=>  "2.0",// TODO 暂时写死，版本更改很有可能也导致json格式改变
 
             "info" => (object)[
                 "title" => $config->get('title'),
