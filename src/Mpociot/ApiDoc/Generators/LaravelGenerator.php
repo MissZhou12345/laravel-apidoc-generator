@@ -44,10 +44,16 @@ class LaravelGenerator extends AbstractGenerator
     public function getMethods($route)
     {
         if (version_compare(app()->version(), '5.4', '<')) {
-            return $route->getMethods();
+            $methods = $route->getMethods();
+        } else {
+            $methods = $route->methods();
         }
 
-        return $route->methods();
+        return array_filter($methods, function ($method) {
+            return !in_array(
+                strtoupper($method), ['HEAD', 'OPTIONS', 'PATCH']
+            );
+        });
     }
 
     /**
@@ -118,9 +124,9 @@ class LaravelGenerator extends AbstractGenerator
             'uri' => str_replace('?', '', $this->getUri($route)),
             'parameters' => [],
             'routeMethod' => $routeMethod,
-            'contentType' => $this->getContentType($routeId,$route,$routeAction),
-            'pathParameters' => $this->getRouteParameters($routeId,$route,$routeAction),
-            'headerParameters' => $this->getHeaderParameters($routeId,$route,$routeAction),
+            'contentType' => $this->getContentType($routeId, $route, $routeAction),
+            'pathParameters' => $this->getRouteParameters($routeId, $route, $routeAction),
+            'headerParameters' => $this->getHeaderParameters($routeId, $route, $routeAction),
             'queryParameters' => [],
             'cookieParameters' => [],
             'response' => $content,
