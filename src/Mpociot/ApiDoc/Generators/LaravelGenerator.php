@@ -75,6 +75,7 @@ class LaravelGenerator extends AbstractGenerator
         $showresponse = null;
 
 
+        $queryParamTag = new GetFromQueryParamTag($this->getConfig());
         $cookieParamTag = new GetFromCookieParamTag($this->getConfig());
         $contentTypeParamTag = new GetContentTypeParamTag($this->getConfig());
 
@@ -127,7 +128,7 @@ class LaravelGenerator extends AbstractGenerator
             'contentType' => $this->getContentType($routeId, $route, $routeAction),
             'pathParameters' => $this->getRouteParameters($routeId, $route, $routeAction),
             'headerParameters' => $this->getHeaderParameters($routeId, $route, $routeAction),
-            'queryParameters' => [],
+            'queryParameters' => $this->getQueryParameters($routeId, $route, $routeAction),
             'cookieParameters' => [],
             'response' => $content,
             'showresponse' => $showresponse,

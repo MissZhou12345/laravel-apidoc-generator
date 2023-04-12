@@ -1,17 +1,18 @@
 {
-    "name": "mpociot/laravel-apidoc-generator",
+    "name": "mz/laravel-apidoc-generator",
     "license": "MIT",
     "description": "Generate beautiful API documentation from your Laravel application",
     "keywords": [
         "API",
         "Documentation",
+        "Swagger",
         "Laravel"
     ],
-    "homepage": "http://github.com/mpociot/laravel-apidoc-generator",
+    "homepage": "https://github.com/MissZhou12345/laravel-apidoc-generator",
     "authors": [
         {
-            "name": "Marcel Pociot",
-            "email": "m.pociot@gmail.com"
+            "name": "Mz",
+            "email": "517013774@qq.com"
         }
     ],
     "require": {

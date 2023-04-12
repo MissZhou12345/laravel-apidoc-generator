@@ -150,6 +150,15 @@ abstract class AbstractGenerator
         return $this->getAttributeData($routeId, $rules);
     }
 
+    protected function getQueryParameters($routeId, $route, $routeAction)
+    {
+        $validator = Validator::make([], $this->getRouteQueryRules($routeAction['uses'], []));
+
+        $rules = (array)$validator->getRules();
+
+        return $this->getAttributeData($routeId, $rules);
+    }
+
     protected function getContentType($routeId, $route, $routeAction)
     {
        return $this->getContentTypeStr($routeAction['uses'], []);
@@ -415,13 +424,13 @@ abstract class AbstractGenerator
     {
         $parameterReflection = $this->getFormRequestReflection($uses, $bindings);
         if (empty($parameterReflection)) {
-            return '';
+            return 'application/json';
         }
 
         if (method_exists($parameterReflection, 'getSwaggerContentType')) {
             return $parameterReflection->getSwaggerContentType();
         } else {
-            return '';
+            return 'application/json';
         }
     }
 
@@ -433,6 +442,20 @@ abstract class AbstractGenerator
         }
 
         if (method_exists($parameterReflection, 'headerRules')) {
+            return $parameterReflection->headerRules();
+        } else {
+            return [];
+        }
+    }
+
+    protected function getRouteQueryRules($uses, $bindings)
+    {
+        $parameterReflection = $this->getFormRequestReflection($uses, $bindings);
+        if (empty($parameterReflection)) {
+            return [];
+        }
+
+        if (method_exists($parameterReflection, 'queryRules')) {
             return $parameterReflection->headerRules();
         } else {
             return [];

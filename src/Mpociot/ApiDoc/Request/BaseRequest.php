@@ -33,6 +33,14 @@ abstract class BaseRequest extends FormRequest implements RequestInterface
     }
 
     /**
+     * @return array
+     */
+    public function queryRules(): array
+    {
+        return [];
+    }
+
+    /**
      * header验证规则
      * @return array
      */
@@ -53,5 +61,5 @@ abstract class BaseRequest extends FormRequest implements RequestInterface
     {
         return 'application/json';
     }
-    
+
 }

@@ -35,6 +35,7 @@ class CollectionWriter
     private function getPropertiesList($parameters)
     {
         $parameterList = [];
+
         foreach ($parameters as $name => $parameter) {
             $type = $parameter['type'];
             if (in_array($parameter['type'], ['date', 'image', 'file', 'url', 'email', 'ip'])) {
@@ -48,6 +49,7 @@ class CollectionWriter
             $param = [
                 "description" => $parameter['description'] ? implode('|', $parameter['description']) : '',
                 "type" => $type,
+                'example' => $parameter['value'] ?? null,
                 "format" => $parameter['format'] ?? null,
             ];
 
@@ -64,13 +66,17 @@ class CollectionWriter
 
     private function getRequestBody($contentType, $parameters)
     {
+        if (!$parameters) {
+            return (object)[];
+        }
+
         return (object)[
             'content' => (object)[
                 $contentType => (object)[
                     'schema' => (object)[
                         'required' => $this->getRequiredList($parameters),
                         'properties' => $this->getPropertiesList($parameters),
-                        'type' => 'object'
+                        'example' => 'object'
                     ]
                 ]
             ]
@@ -88,24 +94,21 @@ class CollectionWriter
 
                 foreach ($route['methods'] as $method) {
                     $routeList[strtolower($method)] = (object)[
-                        'tags' => [$route['resource']],
                         'summary' => $route['title'],
+                        'x-apifox-folder' => $route['resource'],
+                        'x-apifox-status' => 'released',
+                        'deprecated' => false,
                         'description' => $route['description'],
                         'operationId' => $route['routeMethod'],
-
-                        'responses' => $this->getResponses($route['response']),
-
-                        'consumes' => [
-                            "multipart/form-data"
-                        ],
-//                        'requestBody' => $this->getRequestBody($route['contentType'], $route['parameters']),
+                        'tags' => [$route['resource']],
                         'parameters' => array_merge(
-                            $this->getParameters($route['parameters'], 'formData'),
                             $this->getParameters($route['queryParameters'], 'query'),
                             $this->getParameters($route['pathParameters'], 'path'),
                             $this->getParameters($route['cookieParameters'], 'cookie'),
                             $this->getParameters($route['headerParameters'], 'header')
-                        )
+                        ),
+                        'requestBody' => $this->getRequestBody($route['contentType'], $route['parameters']),
+                        'responses' => $this->getResponses($route['response']),
                     ];
                 }
 
@@ -115,7 +118,7 @@ class CollectionWriter
         }
 
         $collection = [
-            "swagger"=>  "2.0",// TODO 暂时写死，版本更改很有可能也导致json格式改变
+            'openapi' => "3.1.0",
 
             "info" => (object)[
                 "title" => $config->get('title'),
@@ -127,12 +130,15 @@ class CollectionWriter
                 "version" => $config->get('version')
             ],
 
-            "servers" => $config->get('servers'),
+            "servers" => $config->get('servers') ?? [],
 
             'paths' => $paths,
 
             "security" => [
                 [] // TODO 暂时未实现
+            ],
+            "components" => (object)[
+                "schemas" => (object)[]
             ]
         ];
 

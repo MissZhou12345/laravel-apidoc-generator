@@ -19,6 +19,12 @@ interface RequestInterface
     public function headerRules(): array;
 
     /**
+     * query验证规则
+     * @return array
+     */
+    public function queryRules(): array;
+
+    /**
      *
      * getSwaggerContentType
      * 默认值：application/json
