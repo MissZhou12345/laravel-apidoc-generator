@@ -456,7 +456,7 @@ abstract class AbstractGenerator
         }
 
         if (method_exists($parameterReflection, 'queryRules')) {
-            return $parameterReflection->headerRules();
+            return $parameterReflection->queryRules();
         } else {
             return [];
         }
