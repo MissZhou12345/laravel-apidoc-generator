@@ -682,7 +682,7 @@ abstract class AbstractGenerator
                 break;
             case 'exists':
                 $fieldName = isset($parameters[1]) ? $parameters[1] : $ruleName;
-                $attributeData['description'][] = Description::parse($rule)->with([Str::singular($parameters[0]), $fieldName])->getDescription();
+                $attributeData['description'][] = "需要在[{$parameters[0]}]表[{$fieldName}]字段中存在";
                 break;
             case 'active_url':
                 $attributeData['type'] = 'url';
