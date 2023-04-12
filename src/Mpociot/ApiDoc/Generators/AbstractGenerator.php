@@ -161,8 +161,9 @@ abstract class AbstractGenerator
 
     protected function getContentType($routeId, $route, $routeAction)
     {
-       return $this->getContentTypeStr($routeAction['uses'], []);
+        return $this->getContentTypeStr($routeAction['uses'], []);
     }
+
     protected function getRouteParameters($routeId, $route, $routeAction)
     {
         $wheres = collect($route->wheres);
@@ -228,6 +229,9 @@ abstract class AbstractGenerator
             ];
 
             $rule = collect($rules)->filter(function ($r) {
+                if (!is_string($r)) {
+                    return false;
+                }
                 return strpos($r, 'describe') !== false;
             });
             if (!empty($rule->first())) {
@@ -792,6 +796,9 @@ abstract class AbstractGenerator
     protected function parseStringRule($rules)
     {
         $parameters = [];
+        if (!is_string($rules)) {
+            return ['func', $parameters];
+        }
 
         // The format for specifying validation rules and parameters follows an
         // easy {rule}:{parameters} formatting convention. For instance the

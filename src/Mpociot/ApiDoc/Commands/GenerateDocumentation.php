@@ -271,7 +271,9 @@ class GenerateDocumentation extends Command
         $bindings = $this->getBindings();
         $parsedRoutes = [];
         foreach ($routes as $route) {
-            if (in_array($route->getName(), $allowedRoutes) || \Str::is($routePrefix, $generator->getUri($route)) || in_array($middleware, $route->middleware())) {
+            if (in_array($route->getName(), $allowedRoutes)
+                || $this->checkRoutePrefix($routePrefix, $generator->getUri($route))
+                || in_array($middleware, $route->middleware())) {
                 if ($this->isValidRoute($route) && $this->isRouteVisibleForDocumentation($route->getAction()['uses'])) {
                     $parsedRoutes[] = $generator->processRoute($route, $bindings, $this->option('header'), $withResponse);
                     $this->info('Processed route: [' . implode(',', $generator->getMethods($route)) . '] ' . $generator->getUri($route));
@@ -282,6 +284,19 @@ class GenerateDocumentation extends Command
         }
 
         return $parsedRoutes;
+    }
+
+    private function checkRoutePrefix($routePrefixStr, $uri)
+    {
+        $isOk = false;
+        $routePrefixArr = explode(',', $routePrefixStr);
+        foreach ($routePrefixArr as $routePrefix) {
+            if (\Str::is($routePrefix, $uri)) {
+                $isOk = true;
+                break;
+            }
+        }
+        return $isOk;
     }
 
     /**
