@@ -147,7 +147,7 @@ class CollectionWriter
 
     private function getResponses($response)
     {
-        $httpCode = [200];
+        $httpCode = 200;
 
         $responseData = json_decode($response);
         if (empty($responseData)) {
@@ -155,7 +155,6 @@ class CollectionWriter
         }
 
         $res = [
-            'description' => 'description',
             'schema' => [
                 '$schema' => "http://json-schema.org/draft-04/schema#",
                 'properties' => [],
@@ -163,6 +162,7 @@ class CollectionWriter
                 'type' => 'object',
             ],
         ];
+
         $properties = [];
         foreach ($responseData as $key => $item) {
             $properties[$key] = $this->dealResponsesStruct($item);
@@ -171,7 +171,12 @@ class CollectionWriter
         $res['schema']['properties'] = (object)$properties;
 
         return [
-            200 => $res
+            $httpCode => (object)[
+                'description' => 'response',
+                'content' => (object)[
+                    'application/json' => (object)$res
+                ],
+            ]
         ];
     }
 

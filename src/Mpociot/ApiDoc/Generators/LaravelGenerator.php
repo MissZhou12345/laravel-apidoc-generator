@@ -82,7 +82,6 @@ class LaravelGenerator extends AbstractGenerator
         if ($withResponse) {
             $response = null;
             $docblockResponse = $this->getDocblockResponse($routeDescription['tags']);
-
             if ($docblockResponse) {
                 // we have a response from the docblock ( @response )
                 $response = $docblockResponse;
@@ -99,6 +98,7 @@ class LaravelGenerator extends AbstractGenerator
             }
             if (!$response) {
                 $transformerResponse = $this->getTransformerResponse($routeDescription['tags']);
+
                 if ($transformerResponse) {
                     // we have a transformer response from the docblock ( @transformer || @transformercollection )
                     $response = $transformerResponse;
@@ -106,12 +106,14 @@ class LaravelGenerator extends AbstractGenerator
                 }
             }
             if (!$response) {
-                $response = $this->getRouteResponse($route, $bindings, $headers);
-            }
-            if ($response->headers->get('Content-Type') === 'application/json') {
-                $content = json_encode(json_decode($response->getContent()), JSON_PRETTY_PRINT);
+                $content = '';
+//                $response = $this->getRouteResponse($route, $bindings, $headers);
             } else {
-                $content = $response->getContent();
+                if ($response->headers->get('Content-Type') === 'application/json') {
+                    $content = json_encode(json_decode($response->getContent()), JSON_PRETTY_PRINT);
+                } else {
+                    $content = $response->getContent();
+                }
             }
         }
 
@@ -299,12 +301,14 @@ class LaravelGenerator extends AbstractGenerator
                 }
                 return \in_array($tag->getName(), ['responseTransformer']);
             });
+
             if (empty($transFormerTags)) {
                 // we didn't have any of the tags so goodbye
                 return false;
             }
 
             $tag = $transFormerTags->first();
+
             if (empty($tag)) {
                 return;
             }
@@ -316,18 +320,20 @@ class LaravelGenerator extends AbstractGenerator
             }
 
             $transformerModel = new $transformer;
+
             $datas = $transformerModel->response();
             $tables = $transformerModel->getTables();
+
             $columnComments = $transformerModel->getColumnComments();
 
             $returnData = [];
             if (empty($tables)) {
-                $tables = \DB::getDoctrineSchemaManager()->listTableNames();
+//                $tables = \DB::getDoctrineSchemaManager()->listTableNames();
             }
             $this->addComment($datas, $tables, $columnComments, $returnData);
-
             return \response(json_encode($returnData));
         } catch (\Exception $e) {
+            \Log::info('LaravelGenerator::getSwaggerTransformerResponse::', [$e->getMessage()]);
             // it isn't possible to parse the transformer
             return;
         }
@@ -347,8 +353,12 @@ class LaravelGenerator extends AbstractGenerator
 
     protected function getComment(array $tables, array $columnComments, string $field)
     {
-        $columns = $this->getColumns($tables);
         $comment = null;
+        if (isset($columnComments[$field]) && $columnComments[$field]) {
+            return $columnComments[$field];
+        }
+
+        $columns = $this->getColumns($tables);
         foreach ($columns as $column) {
             if (isset($columnComments[$field]) && $columnComments[$field]) {
                 $comment = $columnComments[$field];
@@ -359,6 +369,7 @@ class LaravelGenerator extends AbstractGenerator
             }
             $comment = $column->getColumn($field)->getComment();
         }
+
         return $comment;
     }
 
@@ -369,6 +380,7 @@ class LaravelGenerator extends AbstractGenerator
                 $this->addComment($data, $tables, $columnComments, $returnData[$key]);
                 $returnData[$key]['_____description'] = $this->getComment($tables, $columnComments, $key);
             } else {
+
                 $returnData[$key] = [
                     '_____key' => Uuid::uuid4()->toString(),
                     'value' => $data,
