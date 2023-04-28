@@ -330,7 +330,7 @@ class LaravelGenerator extends AbstractGenerator
             if (empty($tables)) {
 //                $tables = \DB::getDoctrineSchemaManager()->listTableNames();
             }
-            $this->addComment($datas, $tables, $columnComments, $returnData);
+            $this->addComment($datas, $tables, $columnComments, null, $returnData);
             return \response(json_encode($returnData));
         } catch (\Exception $e) {
             \Log::info('LaravelGenerator::getSwaggerTransformerResponse::', [$e->getMessage()]);
@@ -353,11 +353,18 @@ class LaravelGenerator extends AbstractGenerator
 
     protected function getComment(array $tables, array $columnComments, string $field)
     {
-        $comment = null;
         if (isset($columnComments[$field]) && $columnComments[$field]) {
             return $columnComments[$field];
+        } else {
+            $arrField = explode('.', $field);
+            $name = $arrField[1] ?? null;
+            if ($name && !is_numeric($name) && isset($columnComments[$name]) && $columnComments[$name]) {
+                return $columnComments[$name];
+            }
+            return null;
         }
 
+        return null;
         $columns = $this->getColumns($tables);
         foreach ($columns as $column) {
             if (isset($columnComments[$field]) && $columnComments[$field]) {
@@ -373,19 +380,23 @@ class LaravelGenerator extends AbstractGenerator
         return $comment;
     }
 
-    private function addComment($datas, $tables, $columnComments, &$returnData)
+    private function addComment($datas, $tables, $columnComments, $parentKey = null, &$returnData)
     {
         foreach ($datas as $key => $data) {
-            if (in_array(gettype($data), ['object', 'array'])) {
-                $this->addComment($data, $tables, $columnComments, $returnData[$key]);
-                $returnData[$key]['_____description'] = $this->getComment($tables, $columnComments, $key);
-            } else {
+            $newKey = $key;
+            if ($parentKey) {
+                $newKey = $parentKey . '.' . $key;
+            }
 
+            if (in_array(gettype($data), ['object', 'array'])) {
+                $this->addComment($data, $tables, $columnComments, $key, $returnData[$key]);
+                $returnData[$key]['_____description'] = $this->getComment($tables, $columnComments, $newKey);
+            } else {
                 $returnData[$key] = [
                     '_____key' => Uuid::uuid4()->toString(),
                     'value' => $data,
                     'type' => gettype($data),
-                    'description' => $this->getComment($tables, $columnComments, $key),
+                    'description' => $this->getComment($tables, $columnComments, $newKey),
                 ];
             }
         }
